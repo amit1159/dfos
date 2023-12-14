@@ -1,0 +1,271 @@
+---
+ - name: Install and configure Node-Red
+   hosts: dev
+   become: yes  # To run commands with sudo privileges
+ 
+   tasks:
+     - name: Update apt cache
+       apt:
+         update_cache: yes
+     - name: Install curl
+       apt:
+         name: curl
+         state: present  
+     - name: Install npm
+       apt:
+         name: npm
+         state: present
+     - name: Install Node-RED globally
+       npm:
+         name: node-red
+         global: yes
+ 
+     - name: Install NVM
+       shell: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash"
+       args:
+         executable: /bin/bash
+ 
+ 
+     - name: Reload .bashrc
+       shell: "source ~/.bashrc"
+       args:
+         executable: /bin/bash
+ 
+ 
+     - name: Install Node.js v16
+       shell: |
+         bash -c "source /root/.nvm/nvm.sh && nvm install v16"
+       tags:
+          - node
+ 
+
+     - name: Run nvm command to install Node.js v16
+       shell: |
+         source ~/.nvm/nvm.sh
+         nvm use v16
+         npm install -g node-red
+       args:
+         executable: /bin/bash
+       tags:
+          - npm
+ 
+     - name: Run nvm command to install Node.js v16
+       shell: |
+         source ~/.nvm/nvm.sh
+         nvm use v16
+         npm install -g pm2
+       args:
+         executable: /bin/bash
+       tags:
+          - npm1
+ 
+     - name: Run nvm command to install Node.js v16
+       shell: |
+         source ~/.nvm/nvm.sh
+         nvm use v16
+         pm2 start node-red
+       args:
+         executable: /bin/bash
+       tags:
+          - npm2
+ 
+     - name: Install Unzip
+       apt:
+         name: unzip
+         state: present
+       tags:
+          - zip
+
+     - name: Download xconnect-setting.zip
+       get_url:
+         url: https://dfos.co/sop_downloads/xconnect-setting.zip
+         dest: /tmp/xconnect-setting.zip
+       tags: unzip1
+ 
+     - name: Unzip xconnect-setting.zip
+       unarchive:
+         src: /tmp/xconnect-setting.zip
+         dest: /root/.node-red/
+         remote_src: yes
+       tags: unzip2
+ 
+ 
+     - name: Copy settings.js and theme.zip
+       copy:
+         src: /root/.node-red/xconnect-setting/settings.js
+         dest: /root/.node-red/settings.js
+         remote_src: yes
+       tags: unzip
+ 
+     - name: Copy theme.zip
+       copy:
+         src: /root/.node-red/xconnect-setting/theme.zip
+         dest: /root/.node-red/theme.zip
+         remote_src: yes
+       tags: unzip
+ 
+     - name: Copy @node-red-contrib-themes.zip
+       copy:
+         src: /root/.node-red/xconnect-setting/@node-red-contrib-themes.zip
+         dest: /root/.node-red/node_modules/@node-red-contrib-themes.zip
+         remote_src: yes
+       tags: unzip
+ 
+ 
+     - name: Unzip xconnect-setting.zip
+       unarchive:
+         src: /root/.node-red/theme.zip
+         dest: /root/.node-red/
+         remote_src: yes
+       tags: unzip2
+ 
+ 
+     - name: Unzip xconnect-setting.zip
+       unarchive:
+         src: /root/.node-red/node_modules/@node-red-contrib-themes.zip
+         dest: /root/.node-red/node_modules
+         remote_src: yes
+       tags: unzip3
+ 
+ 
+     - name: Restart Node-Red with PM2
+       command: /root/.nvm/versions/node/v16.20.2/bin/node /root/.nvm/versions/node/v16.20.2/bin/pm2 restart node-red
+       args:
+         chdir: /root/.pm2
+       tags:
+          - restart
+ 
+     - name: Restart Node-Red with PM2
+       command: /root/.nvm/versions/node/v16.20.2/bin/node /root/.nvm/versions/node/v16.20.2/bin/pm2 save
+       args:
+         chdir: /root/.pm2
+       tags:
+          - restart1
+ 
+     - name: Restart Node-Red with PM2
+       command: /root/.nvm/versions/node/v16.20.2/bin/node /root/.nvm/versions/node/v16.20.2/bin/pm2 status
+       args:
+         chdir: /root/.pm2
+       tags:
+          - restart2
+ 
+ 
+ 
+     - name: create directories for multiple instances
+       file:
+         path: "/home/{{ item }}"
+         state: directory
+       loop:
+         - "instance1"
+         - "instance2"
+         - "instance4"
+ 
+     - name: Check if source directory exists
+       stat:
+         path: /root/.node-red
+       register: src_dir
+ 
+     - name: Copy Node-Red configuration to multiple instances
+       shell: "cp -r /root/.node-red/* /home/{{ item }}"
+       loop:
+         - "instance1"
+         - "instance2"
+         - "instance4"
+ 
+ 
+     - name: Replace uiPort in settings.js
+       replace:
+         path: /home/instance1/settings.js  # Path to your settings.js file
+         regexp: '^(\s*uiPort:).*$'
+         replace: '  uiPort: process.env.PORT || 1881,'
+       tags:
+         - replace
+ 
+     
+     - name: Replace uiPort in settings.js
+       replace:
+         path: /home/instance2/settings.js  # Path to your settings.js file
+         regexp: '^(\s*uiPort:).*$'
+         replace: '  uiPort: process.env.PORT || 1882,'
+       tags:
+         - replace
+ 
+     - name: Replace uiPort in settings.js
+       replace:
+         path: /home/instance4/settings.js  # Path to your settings.js file
+         regexp: '^(\s*uiPort:).*$'
+         replace: '  uiPort: process.env.PORT || 1884,'
+       tags:
+         - replace
+ 
+     - name: Create ecosystem.config.js
+       copy:
+         content: |
+           module.exports = {
+             apps: [
+               {
+                 name: 'node-red-instance1',
+                 script: 'node-red',
+                 args: ['-p', '1881', '-s', '/home/instance1/settings.js', '-u', '/home/instance1/'],
+               },
+               {
+                 name: 'node-red-instance2',
+                 script: 'node-red',
+                 args: ['-p', '1882', '-s', '/home/instance2/settings.js', '-u', '/home/instance2/'],
+               },
+               {
+                 name: 'node-red-instance4',
+                 script: 'node-red',
+                 args: ['-p', '1884', '-s', '/home/instance4/settings.js', '-u', '/home/instance4/'],
+               }
+             ],
+           }
+         dest: "/home/ecosystem.config.js"
+ 
+ 
+ 
+     - name: Remove ^M characters from file
+       replace:
+         path: /home/instance1/settings.js
+         regexp: '\r'
+         replace: ''
+       tags:
+          - m
+ 
+     - name: Remove ^M characters from file
+       replace:
+         path: /home/instance2/settings.js
+         regexp: '\r'
+         replace: ''
+       tags:
+          - m
+ 
+     - name: Remove ^M characters from file
+       replace:
+         path: /home/instance4/settings.js
+         regexp: '\r'
+         replace: ''
+       tags:
+          - m
+ 
+ 
+     - name: Run nvm command to install Node.js v16
+       shell: |
+          source ~/.nvm/nvm.sh
+          nvm use v16
+          pm2 reload /home/ecosystem.config.js
+       args:
+          executable: /bin/bash
+       tags:
+         - pm2
+ 
+ 
+     - name: Run nvm command to install Node.js v16
+       shell: |
+          source ~/.nvm/nvm.sh
+          nvm use v16
+          pm2 restart /home/ecosystem.config.js
+       args:
+          executable: /bin/bash
+       tags:
+         - pm2
