@@ -1,0 +1,199 @@
+---
+ - name: Install LAMP Stack on Ubuntu 22.04
+   hosts: amit
+   become: yes 
+   tasks:
+    
+    - name: Run the equivalent of "apt-get update" as a separate step
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+      tags:
+        - apache
+
+    - name: sync from qa to prod
+      ansible.builtin.synchronize:
+         src: /ansible/dfos/app
+         dest: /var/www/html/
+         mode: push
+    
+    - name: Delete .htaccess files from the app directory
+      file:
+        path: /var/www/html/app/.htaccess
+        state: absent
+
+
+    - name: Create .htaccess file
+      copy:
+        content: |
+          <IfModule mod_rewrite.c>
+          RewriteEngine On
+          RewriteCond %{REQUEST_FILENAME} !-f
+          RewriteCond %{REQUEST_FILENAME} !-d
+          RewriteRule ^(.*)$ index.php/$1 [L]
+          </IfModule>
+        dest: /var/www/html/app/.htaccess    
+
+    
+    - name: Change permissions of .htaccess file to 777
+      file:
+        path: /var/www/html/app/.htaccess
+        owner: root
+        group: root
+        mode: 0777
+
+
+    - name: Enable Apache Rewrite Module
+      command: a2enmod rewrite
+
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+
+
+    - name: List UFW applications
+      command: ufw app list
+      register: ufw_apps
+
+    - name: Allow Apache Full
+      ufw:
+        rule: allow
+        app: "Apache Full"
+
+    - name: Allow OpenSSH
+      ufw:
+        rule: allow
+        app: OpenSSH
+
+    - name: Allow port 22
+      ufw:
+        rule: allow
+        port: 22
+        proto: tcp  
+
+    - name: Allow port 443
+      ufw:
+        rule: allow
+        port: 443
+        proto: tcp  
+
+    - name: Allow port 80/tcp
+      ufw:
+        rule: allow
+        port: 80
+        proto: tcp  
+
+ 
+
+    - name: Installation install software-properties-common
+      apt: name=software-properties-common
+
+    - name: "Repo PHP 7.2"
+      apt_repository:
+        repo="ppa:ondrej/php"
+   
+    - name: "Updating the repo"
+      apt: update_cache=yes
+
+    - name: Installation PHP 7.2
+      apt: name=php7.2 state=present
+
+    - name: Install PHP and required modules
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - php7.2-common
+        - php7.2-mysql 
+        - php7.2-xml 
+        - php7.2-xmlrpc 
+        - php7.2-curl 
+        - php7.2-gd 
+        - php7.2-imagick 
+        - php7.2-cli 
+        - php7.2-dev 
+        - php7.2-imap 
+        - php7.2-mbstring 
+        - php7.2-opcache 
+        - php7.2-soap 
+        - php7.2-zip 
+        - php7.2-redis 
+        - php7.2-intl 
+
+    - name: Install MySQL Server
+      apt:
+        name: mysql-server
+        state: present
+      tags:
+        - mysql
+
+     
+    - name: Download phpmyadmin
+      get_url:
+        url: https://files.phpmyadmin.net/phpMyAdmin/5.2.1/phpMyAdmin-5.2.1-all-languages.zip
+        dest: /var/www/html/
+      tags:
+        - zip
+
+
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: present
+
+    - name: unzip phpmyadmin
+      unarchive:
+        src: /var/www/html/phpMyAdmin-5.2.1-all-languages.zip
+        dest: /var/www/html/
+        remote_src: yes
+
+    - name: Rename a file
+      shell: mv /var/www/html/phpMyAdmin-5.2.1-all-languages/ /var/www/html/phpmyadmin
+      become: yes
+          
+
+
+    - name: Replace DirectoryIndex in Apache config
+      replace:
+        path: /etc/apache2/mods-enabled/dir.conf 
+        regexp: 'DirectoryIndex (.*)'
+        replace: 'DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm'
+      notify:
+        - Restart Apache
+      tags:
+        - change    
+
+    - name: Create info.php file
+      file:
+        path: /var/www/html/info.php
+        state: touch
+
+    - name: Copy using inline content
+      copy:
+        content: '<?php phpinfo();'
+        dest: /var/www/html/info.php
+      
+        
+
+    - name: Change AllowOverride in Apache httpd.conf
+      replace:
+        path: /etc/apache2/apache2.conf
+        regexp: 'AllowOverride None'
+        replace: 'AllowOverride all'
+      tags:
+        - apache2    
+
+   handlers:
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+      tags:
+        - apache2
