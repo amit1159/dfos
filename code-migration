@@ -1,0 +1,60 @@
+---
+ - name: sync data from qa to prod
+   hosts: prod
+   tasks:
+
+    
+     - name: Execute the command in remote shell; stdout goes to the specified file on the remote
+       ansible.builtin.shell: rm -rf /var/www/html/migration/*
+
+
+     - name: Archive files into a zip file
+       ansible.builtin.archive:
+         path: /var/www/html/app/application/controllers
+         dest: /var/www/html/migration/controllers.zip
+         format: zip
+
+     - name: Archive files into a zip file
+       ansible.builtin.archive:
+         path: /var/www/html/app/application/models
+         dest: /var/www/html/migration/models.zip
+         format: zip
+
+     - name: Archive files into a zip file
+       ansible.builtin.archive:
+         path: /var/www/html/app/application/views
+         dest: /var/www/html/migration/views.zip
+         format: zip
+
+     - name: Archive files into a zip file
+       ansible.builtin.archive:
+         path: /var/www/html/app/application/config/routes.php
+         dest: /var/www/html/migration/routes.php.zip
+         format: zip
+
+
+
+     - name: sync from qa to prod
+       ansible.builtin.synchronize:
+         src: /var/www/html/app/application/controllers
+         dest: /var/www/html/app/application/
+         mode: push
+
+     - name: sync from qa to prod
+       ansible.builtin.synchronize:
+         src: /var/www/html/app/application/models
+         dest: /var/www/html/app/application/
+         mode: push
+
+     - name: sync from qa to prod
+       ansible.builtin.synchronize:
+         src: /var/www/html/app/application/views
+         dest: /var/www/html/app/application/
+         mode: push
+
+     - name: sync from qa to prod
+       ansible.builtin.synchronize:
+         src: /var/www/html/app/application/config/routes.php
+         dest: /var/www/html/app/application/config/
+         mode: push
+
