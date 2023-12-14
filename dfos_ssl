@@ -1,0 +1,78 @@
+---
+- hosts: amit
+  become: yes
+  tasks:
+  - name: Create /etc/ssl/key directory
+    file:
+      path: /etc/ssl/key
+      state: directory
+      mode: 0755
+      owner: root
+      group: root
+
+  - name: Download dfos.co_2023-ssl.zip
+    command: wget https://dfos.co/sop_downloads/dfos.co_2023-ssl.zip
+
+  - name: Install unzip
+    apt:
+      name: unzip
+      state: present
+
+  - name: Unzip dfos.co_2023.zip
+    unarchive:
+      src: dfos.co_2023-ssl.zip
+      dest: /etc/ssl/
+      owner: root
+      group: root
+
+  - name: Remove dfos.co_2023.zip
+    file:
+      path: dfos.co_2023-ssl.zip
+      state: absent
+
+  - name: Move certificates and key to correct directories
+    file:
+      src: /etc/ssl/dfos.co_2022/STAR_dfos_co.crt
+      dest: /etc/ssl/certs/STAR_dfos_co.crt
+      owner: root
+      group: root
+      state: link
+
+    file:
+      src: /etc/ssl/dfos.co_2022/STAR_dfos_co.ca-bundle
+      dest: /etc/ssl/certs/STAR_dfos_co.ca-bundle
+      owner: root
+      group: root
+      state: link
+
+    file:
+      src: /etc/ssl/dfos.co_2022/custom.key
+      dest: /etc/ssl/key/custom.key
+      owner: root
+      group: root
+      state: link
+
+  - name: Remove dfos.co_2022 directory
+    file:
+      path: /etc/ssl/dfos.co_2022
+      state: absent
+
+  - name: Set permissions on key file
+    file:
+      path: /etc/ssl/key/custom.key
+      mode: 0600
+      owner: root
+      group: root
+
+  - name: Set permissions on certificate files
+    file:
+      path: /etc/ssl/certs/STAR_dfos_co.crt
+      mode: 0600
+      owner: root
+      group: root
+
+    file:
+      path: /etc/ssl/certs/STAR_dfos_co.ca-bundle
+      mode: 0644
+      owner: root
+      group: root
