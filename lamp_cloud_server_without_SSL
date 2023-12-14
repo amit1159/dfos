@@ -1,0 +1,142 @@
+---
+ - name: Install LAMP Stack on Ubuntu 22.04
+   hosts: gcp
+   become: yes 
+   tasks:
+    
+    - name: Run the equivalent of "apt-get update" as a separate step
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+      tags:
+        - apache
+
+    - name: sync from qa to prod
+      ansible.builtin.synchronize:
+         src: /ansible/dfos/app
+         dest: /var/www/html/
+         mode: push
+
+    - name: Delete .htaccess files from the app directory
+      file:
+        path: /var/www/html/app/.htaccess
+        state: absent
+      tags: 
+        - ht    
+
+
+    - name: Create .htaccess file
+      copy:
+        content: |
+          <IfModule mod_rewrite.c>
+          RewriteEngine On
+          RewriteCond %{REQUEST_FILENAME} !-f
+          RewriteCond %{REQUEST_FILENAME} !-d
+          RewriteRule ^(.*)$ index.php/$1 [L]
+          </IfModule>
+        dest: /var/www/html/app/.htaccess
+      tags:
+        - ht    
+
+    - name: Change permissions of .htaccess file to 777
+      file:
+        path: /var/www/html/app/.htaccess
+        owner: root
+        group: root
+        mode: 0777
+      tags:
+        - ht    
+  
+
+    - name: Enable Apache Rewrite Module
+      command: a2enmod rewrite
+      tags:
+        - ht   
+
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+      tags:
+        - ht 
+      
+
+
+    - name: Installation install software-properties-common
+      apt: name=software-properties-common
+
+    - name: "Repo PHP 7.2"
+      apt_repository:
+        repo="ppa:ondrej/php"
+   
+    - name: "Updating the repo"
+      apt: update_cache=yes
+
+    - name: Installation PHP 7.2
+      apt: name=php7.2 state=present
+
+    - name: Install PHP and required modules
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - php7.2-common
+        - php7.2-mysql 
+        - php7.2-xml 
+        - php7.2-xmlrpc 
+        - php7.2-curl 
+        - php7.2-gd 
+        - php7.2-imagick 
+        - php7.2-cli 
+        - php7.2-dev 
+        - php7.2-imap 
+        - php7.2-mbstring 
+        - php7.2-opcache 
+        - php7.2-soap 
+        - php7.2-zip 
+        - php7.2-redis 
+        - php7.2-intl 
+
+
+    - name: Replace DirectoryIndex in Apache config
+      replace:
+        path: /etc/apache2/mods-enabled/dir.conf 
+        regexp: 'DirectoryIndex (.*)'
+        replace: 'DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm'
+      notify:
+        - Restart Apache
+      tags:
+        - change    
+
+    - name: Create info.php file
+      file:
+        path: /var/www/html/info.php
+        state: touch
+
+    - name: Copy using inline content
+      copy:
+        content: '<?php phpinfo();'
+        dest: /var/www/html/info.php
+      
+        
+
+    - name: Change AllowOverride in Apache httpd.conf
+      replace:
+        path: /etc/apache2/apache2.conf
+        regexp: 'AllowOverride None'
+        replace: 'AllowOverride all'
+      tags:
+        - apache2    
+
+   handlers:
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+      tags:
+        - apache2
