@@ -131,7 +131,11 @@
         regexp: 'AllowOverride None'
         replace: 'AllowOverride all'
       tags:
-        - apache2    
+        - apache2
+
+    - name: Enable Apache Rewrite Module
+      command: a2enmod rewrite
+     
 
    handlers:
     - name: Restart Apache
